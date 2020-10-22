@@ -7,10 +7,8 @@ configure({enforceActions: 'always'})
 
 class ActivityStore {
     activityRegistry = new Map();
-    activities: IActivity[] = [];
-    selectedActivity: IActivity | null | undefined = null 
+    activity: IActivity | null = null
     loadingInitial = false;
-    editMode = false;
     submitting = false;
     target = ''
 
@@ -39,9 +37,37 @@ class ActivityStore {
         }
     }
 
+    @action loadActivity = async (id: string) => {
+        let activity = this.getActivity(id);
+        if (activity){
+            this.activity = activity;
+        } else {
+            this.loadingInitial = true
+            try {
+                activity = await agent.Activities.details(id)
+                runInAction(() => {
+                    this.activity = activity
+                    this.loadingInitial = false
+                })
+            } catch(err) {
+                runInAction(() => {
+                    this.loadingInitial = false
+                })
+                console.log(err)
+            }
+        }
+    }
+
+    @action clearActivity = () => {
+        this.activity = null
+    }
+
+    getActivity = (id: string) => {
+        return this.activityRegistry.get(id)
+    }
+
     @action selectActivity = (id: string) => {
-        this.selectedActivity = this.activityRegistry.get(id);
-        this.editMode = false
+        this.activity = this.activityRegistry.get(id);
     }
 
     @action createActivity = async (activity: IActivity) => {
@@ -49,7 +75,6 @@ class ActivityStore {
         try {
             await agent.Activities.create(activity)
             this.activityRegistry.set(activity.id, activity)
-            this.editMode = false
             this.submitting = false 
         } catch (err) {
             this.submitting = false 
@@ -62,8 +87,7 @@ class ActivityStore {
         try {
             await agent.Activities.update(activity)
             this.activityRegistry.set(activity.id, activity)
-            this.selectedActivity = activity
-            this.editMode = false
+            this.activity = activity           
             this.submitting = false 
         } catch (err) {
             this.submitting = false 
@@ -85,24 +109,7 @@ class ActivityStore {
             console.log(err);
         }
     }
-
-    @action openEditForm = (id: string) => {
-        this.selectedActivity = this.activityRegistry.get(id)
-        this.editMode = true 
-    }
-
-    @action cancelSelectedActivity = () => {
-        this.selectedActivity = null
-    }
-
-    @action cancelFormOpen= () => {
-        this.editMode = false
-    }
-
-    @action openCreateForm = () => {
-        this.editMode = true 
-        this.selectedActivity = null 
-    }
+  
 }
 
 export default createContext(new ActivityStore())
